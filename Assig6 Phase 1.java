@@ -1,4 +1,3 @@
-
 /* ---------------------------------------------------------------------------------------------------------------- 
 Nautilus Group
 Caleb Allen
@@ -7,14 +6,15 @@ David Harrison
 Dustin Whittington
 Michael Cline
 CST 338
-M6: GUI Card Java Program
-30 May 2017
+M6: Timed High-Card Java Program
+06 June 2017
+
 PURPOSE
-Over several phases, we will be using the classes we wrote from M3 (Card, Hand, and Deck) and adding to those classes
-the a GUI framework.  To do this we will use some additional classes and create some of our own.
-This is the third phase out of three.  This third and final phase The final phase will add the CardGameFramework
-class so that your card tools can be combined with your GUI tools to create a GUI program that has real computational
-power for a GUI card game, "High Card".
+Over several phases, we will be using the classes we wrote from M5 and adding to those classes to develop a new timed
+high-card game.  This is the first phase.  In this phase, we will rework the code from last week into a MVC pattern.
+This pattern will be used throughout the other phases of this assignment.  For our MVC pattern, class CardGameFramework
+will function as our model, class CardTable will function as our view, and class Controller will function as our
+controller.
 ----------------------------------------------------------------------------------------------------------------- */
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
@@ -56,6 +56,7 @@ public class Assig6
    }
 }
 
+//functions as the model
 class CardGameFramework
 {
    private static final int MAX_PLAYERS = 50;
@@ -153,7 +154,6 @@ class CardGameFramework
    public Hand getHand(int k)
    {
       // hands start from 0 like arrays
-
       // on error return automatic empty hand
       if (k < 0 || k >= numPlayers)
          return new Hand();
@@ -273,6 +273,7 @@ class CardGameFramework
    }
 }
 
+//functions as the view
 class CardTable extends JFrame
 {
    static final int MAX_CARDS_PER_HAND = 56;
@@ -318,10 +319,12 @@ class CardTable extends JFrame
       pnlPlayArea.setLayout(new GridLayout(2, 2));
       pnlPlayArea.setBorder(BorderFactory.createTitledBorder("Play Area"));
 
+      //border layouts
       add(pnlComputerHand, BorderLayout.NORTH);
       add(pnlHumanHand, BorderLayout.SOUTH);
       add(pnlPlayArea, BorderLayout.CENTER);
 
+      //settings
       setSize(1200, 600);
       setLocationRelativeTo(null);
       setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -362,7 +365,8 @@ class CardTable extends JFrame
          if (computerWinnings[i] == null)
          {
 
-         } else
+         }
+         else
          {
             computerLabels[i] = new JLabel(GUICard.getIcon(computerWinnings[i]));
             pnlComputerHand.add(computerLabels[i]);
@@ -375,7 +379,8 @@ class CardTable extends JFrame
          if (playerWinnings[i] == null)
          {
 
-         } else
+         }
+         else
          {
             humanLabels[i] = new JLabel(GUICard.getIcon(playerWinnings[i]));
             pnlHumanHand.add(humanLabels[i]);
@@ -396,7 +401,8 @@ class CardTable extends JFrame
          if (playerCount == computerHandID)
          {
             l = new JLabel("Computer ", JLabel.CENTER);
-         } else
+         }
+         else
          {
             l = new JLabel("Player " + playerCount, JLabel.CENTER);
          }
@@ -411,11 +417,13 @@ class CardTable extends JFrame
             try
             {
                playedCardLabels[i] = new JLabel(GUICard.getIcon(lastComputerCard));
-            } catch (Exception exception)
+            }
+            catch (Exception exception)
             {
                playedCardLabels[i] = new JLabel();
             }
-         } else
+         }
+         else
          {
             try
             {
@@ -444,7 +452,6 @@ class CardTable extends JFrame
          b.add(humanLabels[i]);
          pnlHumanHand.add(b);
       }
-
       repaint();
       revalidate();
    }
@@ -464,6 +471,7 @@ class CardTable extends JFrame
    }
 }
 
+//functions as the controller
 class Controller
 {
    private CardTable view;
@@ -541,7 +549,8 @@ class Controller
                // make player go first next round
                isComputerFirst = false;
                isComputerFinished = false;
-            } else if (compareCards(model.getLastHumanCard(), model.getLastComputerCard()) < 0)
+            }
+            else if (compareCards(model.getLastHumanCard(), model.getLastComputerCard()) < 0)
             {
                model.computerWonRound(model.getLastHumanCard(), model.getLastComputerCard());
                view.displayRoundResults(
@@ -737,7 +746,8 @@ class Card
       if (errorFlag == false)
       {
          return this.value + " of " + this.suit;
-      } else
+      }
+      else
       {
          return "[ invalid ]";
       }
@@ -752,7 +762,8 @@ class Card
          this.suit = suit;
          this.errorFlag = false;
          return true;
-      } else
+      }
+      else
       {
          this.errorFlag = true;
          return false;
@@ -808,7 +819,8 @@ class Card
       if (card == this)
       {
          return true;
-      } else
+      }
+      else
       {
          return (card.getValue() == this.getValue()) && (card.getSuit().equals(this.getSuit()))
                && (card.getErrorFlag() == this.getErrorFlag());
@@ -934,7 +946,8 @@ class Deck
       if (topCard < 0 || topCard > numPacks * 56)
       {
          return null;
-      } else
+      }
+      else
       {
          // Removes the top card from the deck before reducing top card.
          Card card = cards[topCard - 1];
@@ -958,7 +971,8 @@ class Deck
       if (k >= 0 && k <= topCard)
       {
          return new Card(cards[k].getValue(), cards[k].getSuit(), cards[k].getErrorFlag());
-      } else
+      }
+      else
       {
          return new Card('Q', Card.Suit.hearts, true);
       }
@@ -1284,7 +1298,8 @@ class Hand
          // Create a copy of the taken card and advance the card counter.
          myCards[numCards++] = new Card(card.getValue(), card.getSuit());
          return true;
-      } else
+      }
+      else
       {
          return false;
       }
@@ -1303,7 +1318,8 @@ class Hand
          // Decrement card counter. Remove the topmost card from the array.
          myCards[--numCards] = null;
          return playedCard;
-      } else
+      }
+      else
       {
          // Returns an invalid card to be consistent with inspectCard()
          return new Card('Q', Card.Suit.hearts, true);
@@ -1317,7 +1333,6 @@ class Hand
        */
       if (numCards > 0 && cardIndex < numCards)
       {
-
          // Get the card we are playing.
          Card playedCard = new Card(myCards[cardIndex].getValue(), myCards[cardIndex].getSuit());
 
@@ -1348,7 +1363,8 @@ class Hand
          numCards = tempCards.length;
 
          return playedCard;
-      } else
+      }
+      else
       {
          // Returns an invalid card to be consistent with inspectCard()
          return new Card('Q', Card.Suit.hearts, true);
