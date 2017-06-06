@@ -26,7 +26,6 @@ import java.awt.Font;
 import java.awt.Dimension;
 import java.util.Date;
 import java.util.Random;
-
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -277,7 +276,7 @@ class CardGameFramework
 	Card playCard(int playerIndex, int cardIndex)
 	{
 		// returns bad card if either argument is bad
-		if (playerIndex < 0 || playerIndex > numPlayers - 1 || cardIndex < 0 || cardIndex > numCardsPerHand - 1)
+		if (playerIndex < 0 || playerIndex > numPlayers - 1 || cardIndex < 0 || cardIndex > hand[playerIndex].getNumCards() - 1)
 		{
 			// Creates a card that does not work
 			return new Card('M', Card.Suit.spades);
@@ -380,7 +379,7 @@ class CardTable extends JFrame
 	public CardTable(String title, int numCardsPerHand, int numPlayers,
 			Controller.Games game)
 	{
-		this(title, numCardsPerHand,numPlayers);
+		this(title, numCardsPerHand, numPlayers);
 		currentGame = game;
 	}
 
@@ -475,6 +474,18 @@ class CardTable extends JFrame
 		repaint();
 		revalidate();
 	}
+
+	public void displayEndGameResults(int computerTurns, int playerTurns)
+	{
+		remove(pnlPlayArea);
+		pnlComputerHand.removeAll();
+		pnlComputerHand.setBorder(BorderFactory.createTitledBorder("Computer turns passed: " + computerTurns));
+		pnlHumanHand.removeAll();
+		pnlHumanHand.setBorder(BorderFactory.createTitledBorder("Your turns passed: " + playerTurns));
+		repaint();
+		revalidate();
+	}
+
 
 	public void updatePlayAreaPanel(int computerHandID, int playerHandID, Card lastComputerCard, Card lastHumanCard)
 	{
@@ -629,10 +640,24 @@ class Controller
 {
 	private CardTable view;
 	private CardGameFramework model;
+
+	//These variables (isComputerFirst - lastComputerCard) are only used by HighCard
 	boolean isComputerFirst = false;
 	boolean isComputerFinished = true;
+	// last cards played by human and computer
+	private Card lastHumanCard;
+	private Card lastComputerCard;
+
 	// The array index of card played by human
 	static int playedCardID = -1;
+
+	//These variables (computerTurn - isUnableToPlay) are only used by Build
+	boolean computerTurn = false;
+	private boolean emptyDeck = false;
+	int playerTurnsSkipped = 0;
+	int computerTurnsSkipped = 0;
+	Card leftPlayCard;
+	Card rightPlayCard;
 
 	// Index of pile human plays card onto
 	static int playedPileID = -1;
@@ -643,9 +668,8 @@ class Controller
 	// Array Index of hands
 	private final int humanHandID = 1;
 	private final int computerHandID = 0;
-	// last cards played by human and computer
-	private Card lastHumanCard;
-	private Card lastComputerCard;
+
+
 
 	private Games currentGame;
 
@@ -694,10 +718,9 @@ class Controller
 
 	private void playBuild()
 	{
-		int playerTurnsSkipped = 0;
-		int computerTurnsSkipped = 0;
-		Card leftPlayCard = model.getCardFromDeck();
-		Card rightPlayCard = model.getCardFromDeck();
+		//Initiates the play area
+		leftPlayCard = model.getCardFromDeck();
+		rightPlayCard = model.getCardFromDeck();
 		view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
 
 		// Timer to allow for game to timeout if ignored.
@@ -707,140 +730,141 @@ class Controller
 		// and there are more cards to play.
 		while (((((new Date().getTime()) / 1000) - activityTimer) < 300) && model.getHand(humanHandID).getNumCards() > 0)
 		{
-			/*
-			 * Planned steps for this section:
-			 * 
-			 * Player Turn
-			 * if user selects a different hand card, deselect first card
-			 * implement Can't Play
-			 * 
-			 * start Computer Turn
-			 * 
-			 * Computer Turn
-			 * get playable values
-			 */
+			//if the deck is empty we end the game
+			if (emptyDeck == true)
+			{
+				view.displayEndGameResults(computerTurnsSkipped, playerTurnsSkipped);
+			}
+
+			//initiates the computers turn
+			if (this.computerTurn == true)
+			{
+				buildComputerTurn();
+			}
+
+			//Updates once the player has selected a card from their hand.
 			if (playedCardID >= 0)
 			{
 
-				if (playedPileID == 0 && checkValues(leftPlayCard))
+				//Triggered once the player has also tried to play a card from their hand
+				//onto one of the piles.
+				if (playedPileID == 0 && checkValues(humanHandID, playedCardID, leftPlayCard))
 				{
 					leftPlayCard = model.playCard(humanHandID, playedCardID);
 					view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
-					model.getHand(humanHandID).takeCard(model.getCardFromDeck());
-					view.updatePlayerHandPanel(model.getHand(humanHandID));
-					playedPileID = -1;
-					playedCardID = -1;
+					buildHumanDraw();
 				}
-				if (playedPileID == 1 && checkValues(rightPlayCard))
+				if (playedPileID == 1 && checkValues(humanHandID, playedCardID, rightPlayCard))
 				{
 					rightPlayCard = model.playCard(humanHandID, playedCardID);
 					view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
-					model.getHand(humanHandID).takeCard(model.getCardFromDeck());
-					view.updatePlayerHandPanel(model.getHand(humanHandID));
-					playedPileID = -1;
-					playedCardID = -1;
+					buildHumanDraw();
 				}
 			}
+			//Triggered if the player presses the "Cannot Play!" button and ends the current turn
 			if (isUnableToPlay == true)
 			{
 				playerTurnsSkipped++;
-				model.getHand(humanHandID).takeCard(model.getCardFromDeck());
-				view.updatePlayerHandPanel(model.getHand(humanHandID));
+				buildHumanDraw();
 				isUnableToPlay = false;
 			}
 		}
 	}
 
-	private boolean checkValues(Card card)
+	//used to check if the card being played is compatible with the pile it is played on
+	private boolean checkValues(int playerID, int cardID, Card card)
 	{
+		//The starting case will be the value of the pile a card was played on.
+		//Each case checks if the played card is the value above or below the pile card.
+		//If the played card is not valid, false is returned.
 		switch (card.getValue()) {
 		case 'A':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'K' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '2')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == 'K' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '2')
 			{
 				return true;
 			}
 			return false;
 		case '2':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'A' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '3')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == 'A' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '3')
 			{
 				return true;
 			}
 			return false;
 		case '3':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '2' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '4')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '2' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '4')
 			{
 				return true;
 			}
 			return false;
 		case '4':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '3' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '5')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '3' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '5')
 			{
 				return true;
 			}
 			return false;
 		case '5':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '4' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '6')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '4' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '6')
 			{
 				return true;
 			}
 			return false;
 		case '6':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '5' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '7')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '5' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '7')
 			{
 				return true;
 			}
 			return false;
 		case '7':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '6' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '8')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '6' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '8')
 			{
 				return true;
 			}
 			return false;
 		case '8':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '7' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '9')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '7' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == '9')
 			{
 				return true;
 			}
 			return false;
 		case '9':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '8' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'T')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '8' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == 'T')
 			{
 				return true;
 			}
 			return false;
 		case 'T':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == '9' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'J')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == '9' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == 'J')
 			{
 				return true;
 			}
 			return false;
 		case 'J':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'T' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'Q')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == 'T' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == 'Q')
 			{
 				return true;
 			}
 			return false;
 		case 'Q':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'J' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'K')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == 'J' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == 'K')
 			{
 				return true;
 			}
 			return false;
 		case 'K':
-			if(model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'Q' 
-			|| model.getHand(humanHandID).inspectCard(playedCardID).getValue() == 'A')
+			if(model.getHand(playerID).inspectCard(cardID).getValue() == 'Q' 
+			|| model.getHand(playerID).inspectCard(cardID).getValue() == 'A')
 			{
 				return true;
 			}
@@ -850,6 +874,95 @@ class Controller
 		}
 	}
 
+	private void buildHumanDraw()
+	{
+		//The player draws a card, the panel is updated, and the listener variables are reset.
+		model.getHand(humanHandID).takeCard(model.getCardFromDeck());
+		view.updatePlayerHandPanel(model.getHand(humanHandID));
+		playedPileID = -1;
+		playedCardID = -1;
+
+		//After drawing, it is the computers turn
+		computerTurn = true;
+
+		//Make sure the deck is not empty
+		if(model.getNumCardsRemainingInDeck() == 0)
+		{
+			this.emptyDeck = true;
+		}
+	}
+
+	private void buildComputerTurn()
+	{
+		boolean cardFound = false;
+		Random generator = new Random();
+		int randomNumber = 0;
+		//The AI will check each card in it's hand and play the first playable card it comes across.
+		for (int cardCount = 0; cardCount < model.getHand(computerHandID).getNumCards(); cardCount++)
+		{
+			//Rolls a random number between 0 and 1
+			randomNumber = generator.nextInt(1);
+
+			//If randomNumber is 0, the AI favors the leftPlayCard
+			if (randomNumber == 0 && checkValues(computerHandID, cardCount, leftPlayCard))
+			{
+				leftPlayCard = model.playCard(computerHandID, cardCount);
+				view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
+				buildComputerDraw();
+				cardFound = true;
+				break;
+			}
+			if (randomNumber == 0 && checkValues(computerHandID, cardCount, rightPlayCard))
+			{
+				rightPlayCard = model.playCard(computerHandID, cardCount);
+				view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
+				buildComputerDraw();
+				cardFound = true;
+				break;
+			}
+
+			//If randomNumber is 1, the AI favors the rightPlayCard
+			if (randomNumber == 1 && checkValues(computerHandID, cardCount, rightPlayCard))
+			{
+				rightPlayCard = model.playCard(computerHandID, cardCount);
+				view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
+				buildComputerDraw();
+				cardFound = true;
+				break;
+			}
+			if (randomNumber == 1 && checkValues(computerHandID, cardCount, leftPlayCard))
+			{
+				leftPlayCard = model.playCard(computerHandID, cardCount);
+				view.updatePlayAreaPanel(leftPlayCard, rightPlayCard);
+				buildComputerDraw();
+				cardFound = true;
+				break;
+			}
+		}
+		if (!cardFound)
+		{
+			//If we make it here the AI did not find a matching card it could play.
+			buildComputerDraw();
+			//increments the number of times the AI has to skip it's turn.
+			computerTurnsSkipped++;
+		}
+	}
+
+	private void buildComputerDraw()
+	{
+		//The computer draws a card and the hand panel is updated.
+		model.getHand(computerHandID).takeCard(model.getCardFromDeck());
+		view.updateComputerHandPanel(model.getHand(computerHandID));
+
+		//Play is passed back to the player
+		computerTurn = false; 
+
+		//Verify the deck is not empty yet
+		if(model.getNumCardsRemainingInDeck() == 0)
+		{
+			this.emptyDeck = true;
+		}
+	}
 
 	private void playHighCard()
 	{
