@@ -11,10 +11,9 @@ M6: Timed High-Card Java Program
 
 PURPOSE
 Over several phases, we will be using the classes we wrote from M5 and adding to those classes to develop a new timed
-high-card game.  This is the first phase.  In this phase, we will rework the code from last week into a MVC pattern.
-This pattern will be used throughout the other phases of this assignment.  For our MVC pattern, class CardGameFramework
-will function as our model, class CardTable will function as our view, and class Controller will function as our
-controller.
+high-card game.  This is the second phase.  In this phase, we will add a timer with a button to stop and start it.
+For our MVC pattern, class CardGameFramework will function as our model, class CardTable will function as our view,
+and class Controller will function as our controller.
 ----------------------------------------------------------------------------------------------------------------- */
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -1576,7 +1575,8 @@ class Hand
       if (0 <= k && k < numCards)
       {
          return new Card(myCards[k].getValue(), myCards[k].getSuit(), myCards[k].getErrorFlag());
-      } else
+      }
+      else
       {
          // Returns invalid card if k is bad
          return new Card('Q', Card.Suit.hearts, true);
