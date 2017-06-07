@@ -22,7 +22,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Date;
 import java.util.Random;
-
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -52,7 +51,7 @@ public class Assig6
       // Create game table as in previous phases.
       CardTable myCardTable = new CardTable("CardTable", NUM_CARDS_PER_HAND, NUM_PLAYERS);
       // Deal cards to players.
-      Controller controller = new Controller(myCardTable, highCardGame);
+      new Controller(myCardTable, highCardGame);
    }
 }
 
@@ -1413,7 +1412,8 @@ class Hand
       if (0 <= k && k < numCards)
       {
          return new Card(myCards[k].getValue(), myCards[k].getSuit(), myCards[k].getErrorFlag());
-      } else
+      }
+      else
       {
          // Returns invalid card if k is bad
          return new Card('Q', Card.Suit.hearts, true);
